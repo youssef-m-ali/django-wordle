@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Django Wordle</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 40px;
+    }
+    #board {
+      display: grid;
+      grid-template-rows: repeat({{ max_attempts }}, 1fr);
+      row-gap: 8px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      column-gap: 8px;
+    }
+    .tile {
+      width: 50px;
+      height: 50px;
+      border: 2px solid #d3d6da;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      text-transform: uppercase;
+      box-sizing: border-box;
+    }
+    .correct {
+      background-color: #6aaa64;
+      color: white;
+      border-color: #6aaa64;
+    }
+    .present {
+      background-color: #c9b458;
+      color: white;
+      border-color: #c9b458;
+    }
+    .absent {
+      background-color: #787c7e;
+      color: white;
+      border-color: #787c7e;
+    }
+    #message {
+      margin-top: 16px;
+      min-height: 1.5em;
+    }
+    #csrf-form {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Django Wordle</h1>
+
+  <div id="board">
+    {% for row_index in rows %}
+    <div class="row">
+      {% for col_index in "01234" %}
+      <div class="tile" data-row="{{ forloop.parentloop.counter0 }}" data-col="{{ forloop.counter0 }}"></div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div id="message"></div>
+
+  <button id="new-game-btn" type="button" style="margin-top: 8px; display: none;">
+    New Game
+  </button>
+
+  <form id="csrf-form" method="post">
+    {% csrf_token %}
+  </form>
+
+  <script>
+    const MAX_ATTEMPTS = {{ max_attempts }};
+    let currentRow = 0;
+    let currentCol = 0;
+    let gameStatus = "{{ status }}";
+
+    function getTile(row, col) {
+      return document.querySelector(`.tile[data-row="${row}"][data-col="${col}"]`);
+    }
+
+    function setMessage(msg) {
+      document.getElementById("message").textContent = msg;
+    }
+
+    function getCsrfToken() {
+      const input = document.querySelector('#csrf-form input[name="csrfmiddlewaretoken"]');
+      return input ? input.value : "";
+    }
+
+    function resetBoard() {
+      document.querySelectorAll(".tile").forEach((tile) => {
+        tile.textContent = "";
+        tile.classList.remove("correct", "present", "absent");
+      });
+      currentRow = 0;
+      currentCol = 0;
+      gameStatus = "in_progress";
+      setMessage("");
+      const btn = document.getElementById("new-game-btn");
+      if (btn) btn.style.display = "none";
+    }
+
+    async function startNewGame() {
+      const formData = new FormData();
+      formData.append("csrfmiddlewaretoken", getCsrfToken());
+
+      const resp = await fetch("{% url 'game:new_game' %}", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!resp.ok) {
+        setMessage("Error starting new game.");
+        return;
+      }
+
+      resetBoard();
+    }
+
+    async function submitGuess(word) {
+      const formData = new FormData();
+      formData.append("word", word);
+      formData.append("csrfmiddlewaretoken", getCsrfToken());
+
+      const resp = await fetch("{% url 'game:submit_guess' %}", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        setMessage(data.error || "Error submitting guess.");
+        return;
+      }
+
+      const data = await resp.json();
+      gameStatus = data.status;
+
+      data.feedback.forEach((fb, i) => {
+        const tile = getTile(currentRow, i);
+        tile.classList.add(fb);
+      });
+
+      if (gameStatus === "won") {
+        setMessage("You win! Solution: " + data.word.toUpperCase());
+        const btn = document.getElementById("new-game-btn");
+        if (btn) btn.style.display = "inline-block";
+      } else if (gameStatus === "lost") {
+        setMessage("You lost. Solution was: " + data.solution.toUpperCase());
+      } else {
+        setMessage("");
+      }
+
+      currentRow += 1;
+      currentCol = 0;
+    }
+
+    function getCurrentWord() {
+      let word = "";
+      for (let c = 0; c < 5; c++) {
+        const tile = getTile(currentRow, c);
+        word += tile.textContent || "";
+      }
+      return word.toLowerCase();
+    }
+
+    function handleKey(e) {
+      if (gameStatus !== "in_progress") return;
+
+      const key = e.key;
+
+      if (key === "Backspace") {
+        if (currentCol > 0) {
+          currentCol -= 1;
+          const tile = getTile(currentRow, currentCol);
+          tile.textContent = "";
+        }
+        return;
+      }
+
+      if (key === "Enter") {
+        if (currentCol < 5) {
+          setMessage("Not enough letters.");
+          return;
+        }
+        const word = getCurrentWord();
+        submitGuess(word);
+        return;
+      }
+
+      if (/^[a-zA-Z]$/.test(key)) {
+        if (currentCol >= 5) return;
+        const tile = getTile(currentRow, currentCol);
+        tile.textContent = key.toUpperCase();
+        currentCol += 1;
+        return;
+      }
+    }
+
+    window.addEventListener("keydown", handleKey);
+    const newGameBtn = document.getElementById("new-game-btn");
+    if (newGameBtn) {
+      newGameBtn.addEventListener("click", startNewGame);
+    }
+  </script>
+</body>
+</html>
+
