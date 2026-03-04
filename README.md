@@ -5,7 +5,7 @@ A minimal Wordle clone implemented with Django and vanilla JavaScript.
 ## Structure
 
 ```text
-wordle_django/
+django-wordle/          # repo root (folder name when you clone)
 ├── game/
 │   ├── logic.py
 │   ├── views.py
@@ -13,12 +13,13 @@ wordle_django/
 │   ├── words.py
 │   ├── words.txt
 │   └── templates/game/wordle.html
-├── wordle_django/
+├── wordle_django/      # Django project config
 │   ├── __init__.py
 │   ├── asgi.py
 │   ├── settings.py
 │   ├── urls.py
 │   └── wsgi.py
+├── .gitignore
 ├── manage.py
 ├── requirements.txt
 └── README.md
@@ -31,10 +32,10 @@ Clone or download this repo, then run these commands from the project root (the 
 ### 1. Change into the project directory
 
 ```bash
-cd wordle_django
+cd django-wordle
 ```
 
-Ensures you're in the project root so all subsequent commands run in the right place.
+If you cloned with a different folder name, use that instead. Ensures you're in the project root so all subsequent commands run in the right place.
 
 ### 2. Create a virtual environment
 
